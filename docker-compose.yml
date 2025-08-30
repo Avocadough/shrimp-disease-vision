@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  shrimp-detection:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./detection_logs.json:/app/detection_logs.json
+      - ./uploads:/app/uploads
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
+    restart: unless-stopped

@@ -1,0 +1,23 @@
+
+# Recommended augmentation for YOLOv8 training:
+# Add these parameters when training:
+
+train_args = {
+    'data': 'datasets/shrimp/data.yaml',
+    'epochs': 100,
+    'imgsz': 640,
+    'batch': 16,
+    
+    # Augmentation parameters
+    'hsv_h': 0.015,  # HSV-Hue augmentation
+    'hsv_s': 0.7,    # HSV-Saturation augmentation  
+    'hsv_v': 0.4,    # HSV-Value augmentation
+    'degrees': 0.0,   # Rotation (+/- deg)
+    'translate': 0.1, # Translation (+/- fraction)
+    'scale': 0.5,     # Scale (+/- gain)
+    'shear': 0.0,     # Shear (+/- deg)
+    'flipud': 0.0,    # Flip up-down (probability)
+    'fliplr': 0.5,    # Flip left-right (probability)
+    'mosaic': 1.0,    # Mosaic augmentation (probability)
+    'mixup': 0.0,     # Mixup augmentation (probability)
+}
