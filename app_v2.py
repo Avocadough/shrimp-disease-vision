@@ -1,9 +1,11 @@
 import streamlit as st
 from ultralytics import YOLO
 import cv2
-import numpy as np
 from PIL import Image
 import time
+from pathlib import Path
+
+CHECKPOINT = Path(__file__).resolve().parent / 'runs/detect/shrimp_disease_best/weights/best.pt'
 
 # ===============================================================
 #                      PAGE CONFIGURATION
@@ -30,27 +32,17 @@ def load_model(model_path):
 DISEASE_INFO = {
     'BG': {
         'name': 'Black Gill Disease',
-        'description': 'พบจุดสีดำที่บริเวณเหงือก อาจเกิดจากการติดเชื้อหรือสภาพน้ำไม่ดี',
-        'severity': 'Medium',
-        'color': (75, 183, 209) # BGR format for OpenCV
+        'description': 'Historical model label for black gill appearance.',
     },
     'WSSV': {
         'name': 'White Spot Syndrome Virus',
-        'description': 'โรคจุดขาว ไวรัสร้ายแรงที่ทำให้กุ้งตายเป็นจำนวนมาก',
-        'severity': 'High',
-        'color': (78, 205, 196)
+        'description': 'Historical model label; an image score cannot confirm viral infection.',
     },
     'WSSV_BG': {
         'name': 'WSSV + Black Gill',
-        'description': 'ติดเชื้อทั้งสองโรคพร้อมกัน สภาพรุนแรงมาก',
-        'severity': 'Critical',
-        'color': (255, 107, 107)
+        'description': 'Historical combined label; a detection cannot establish co-infection.',
     }
 }
-# Make sure your model's class names match these keys
-CLASS_NAMES = ['BG', 'WSSV', 'WSSV_BG']
-
-
 # ===============================================================
 #                         SESSION STATE
 # ===============================================================
@@ -66,25 +58,28 @@ if 'original_image' not in st.session_state:
 # ===============================================================
 with st.sidebar:
     st.title("🦐 Shrimp Disease Detection")
-    st.markdown("AI-powered detection for Black Gill, WSSV, and combined infections.")
+    st.markdown("Experimental image detection for Black Gill, WSSV, and combined classes.")
+    st.caption("Research prototype: model output is not a diagnosis.")
     st.divider()
 
     st.header("⚙️ Settings")
     confidence = st.slider(
         "Confidence Threshold", 
         min_value=0.0, max_value=1.0, value=0.25, step=0.05,
-        help="Minimum probability to consider a detection valid."
+        help="Minimum model confidence score to show a detection."
     )
+    if (st.session_state.detection_results is not None and
+            st.session_state.detection_results.get('confidence') != confidence):
+        st.session_state.detection_results = None
     
     st.divider()
     st.header("📊 Model Info")
-    st.info("• **Model:** YOLOv8\n• **Classes:** 3 Diseases")
+    st.info("• **Model:** YOLOv8\n• **Classes:** 3 model labels")
     
     st.divider()
     st.header("🦠 Disease Types")
     for key, info in DISEASE_INFO.items():
         st.markdown(f"**{info['name']}**")
-        st.caption(f"Severity: {info['severity']}")
 
 # ===============================================================
 #                         MAIN INTERFACE
@@ -123,21 +118,27 @@ if image_file:
     if detect_button:
         with st.spinner("🔍 Analyzing image... Please wait."):
             # Load the model
-            model = load_model('C:/Users/Admin/Desktop/กุ้ง/runs/detect/shrimp_disease_v3/weights/best.pt')
-            
-            # Convert PIL image to numpy array for model prediction
-            img_array = np.array(st.session_state.original_image)
+            if not CHECKPOINT.is_file():
+                st.error("The included model checkpoint is missing. See the README for its expected path.")
+                st.stop()
+            model = load_model(str(CHECKPOINT))
             
             # Make prediction
             start_time = time.time()
-            results = model.predict(img_array, conf=confidence)
+            results = model.predict(st.session_state.original_image, conf=confidence)
             end_time = time.time()
             
             # Store results in session state
             st.session_state.detection_results = {
                 'results': results,
-                'inference_time': (end_time - start_time)
+                'inference_time': (end_time - start_time),
+                'confidence': confidence,
             }
+else:
+    st.session_state.original_image = None
+    st.session_state.detection_results = None
+    if 'new_image' in st.session_state:
+        del st.session_state.new_image
             
 # Display results if they exist in session state
 if st.session_state.detection_results:
@@ -156,10 +157,10 @@ if st.session_state.detection_results:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Original Image")
-        st.image(st.session_state.original_image, use_container_width=True) # <-- FIXED
+        st.image(st.session_state.original_image, use_column_width=True)
     with col2:
         st.subheader("Annotated Image")
-        st.image(annotated_image, use_container_width=True) # <-- FIXED
+        st.image(annotated_image, use_column_width=True)
 
     # --- Detection Details Section ---
     if results[0].boxes and len(results[0].boxes) > 0:
@@ -170,25 +171,23 @@ if st.session_state.detection_results:
         
         for i, box in enumerate(results[0].boxes):
             class_id = int(box.cls[0])
-            disease_key = CLASS_NAMES[class_id]
-            disease = DISEASE_INFO[disease_key]
+            disease_key = results[0].names.get(class_id, str(class_id))
+            disease = DISEASE_INFO.get(disease_key)
+            if disease is None:
+                st.warning(f"Unknown model class: {disease_key}")
+                continue
             
             # Using a container with a border for each detection
-            with st.container(border=True):
+            with st.container():
                 st.markdown(f"**Detection #{i+1}: {disease['name']}**")
                 
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.metric("Confidence", f"{box.conf[0]:.2%}")
-                with c2:
-                    severity_color = {'Medium': '🟡', 'High': '🟠', 'Critical': '🔴'}
-                    st.metric("Severity", f"{severity_color[disease['severity']]} {disease['severity']}")
+                st.metric("Model confidence", f"{box.conf[0]:.2%}")
                 
                 st.info(f"ℹ️ **Description:** {disease['description']}")
                 
     else:
         st.warning("✅ No specific disease areas were detected at this confidence level.")
-        st.info("The shrimp appears to be healthy or the image quality might be insufficient for detection.")
+        st.info("No detection at this threshold does not establish that the shrimp is healthy.")
         st.caption(f"⚡ Inference time: {inference_time*1000:.1f} ms")
 
 else:
