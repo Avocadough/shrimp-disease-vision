@@ -1,4 +1,18 @@
-# Shrimp image detection experiments
+<div align="center">
+
+# Shrimp Disease Vision
+
+**Exploring shrimp-image detection with YOLO and Streamlit.**
+
+![Python](https://img.shields.io/badge/Python-Computer%20Vision-3776AB?logo=python&logoColor=white)
+![YOLO](https://img.shields.io/badge/Ultralytics-YOLO-111F68?logo=ultralytics&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-Prototype-FF4B4B?logo=streamlit&logoColor=white)
+
+[Overview](#overview) · [Project files](#explore-the-project) · [Run](#start-the-interface) · [Limitations](#evaluation-limits)
+
+</div>
+
+## Overview
 
 An exploratory computer-vision project using YOLO to detect three historical model labels in shrimp images: `BG`, `WSSV` and `WSSV_BG`. The repository contains training notebooks, a Streamlit interface, historical training outputs and checkpoints.
 
